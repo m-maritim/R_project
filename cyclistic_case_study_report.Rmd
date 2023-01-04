@@ -1,0 +1,169 @@
+---
+title: "Data_cleaning"
+author: "meshack Maritim"
+date: "2022-07-22"
+output:
+  pdf_document: default
+  html_document: default
+---
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+## The Ask Phase
+
+**Cyclistic** is a bike-sharing company with two distinct customers; casual riders and Cyclistic members. The financial analyst has come up with a conclusion that the annual members bring more profit to the company as opposed to the casual riders.
+The purpose of this analysis is to give a clear picture of the distinction between the annual customers and the casual rider, the factors that influence a casual rider's decision to purchase a membership, and how digital media may impact their marketing strategies.
+The outcome of this analysis process will ascertain or demystify the previously held perception that the annual customers bring more profit than the casual riders, thus helping in advising the company marketing strategists on the way forward. 
+
+## Prepare
+
+The analysis uses past data from <https://divvy-tripdata.s3.amazonaws.com/index.html>, for the period from June 2021 to May 2022 from DIVY Bike-sharing Services. The data is formatted into a .CSV file. The data is licensed as per the Data License Agreement and made available by Motivate international Link (Divvy Bikes, n.d.). Some of the clauses of the agreement are that the users are granted grants a non-exclusive, royalty-free, limited, perpetual license to access, reproduce, analyze, copy, modify, distribute the data in your product or service and use the Data for any lawful purpose.
+
+To check on the data integrity issues, the ROCCC principle is applied to access the reliability, originality, comprehensiveness, the date the data was collected and if the sources can be reliably cited. The data used in the analysis process was collected in the period between July 2021 and june 2022, ascertaining its currentness. The originality of the data can also be ascertained from the source, that is divybikes website. The data also contains enough information here meaningful conclusions can be made, thus satisfying the requirement of being comprehensive. 
+
+Some of the files made available for analysis are too large and thus may lead to import errors. 
+
+###Process
+The preferred tools for data processing for this case study are R Studio and Tableau for Visualization due to the volumes of the dataset.
+
+###Data cleaning Process
+To clean the data using R Studio, the data needs to be uploaded from the local storage into R Studio. This is accomplished using the read.csv R function. A tidyverse data analysis, including any other useful data analysis needs to be installed and loaded.
+
+The dataset is arranged in tabular form and thus the data.table module from the tidyverse package becomes useful while working with tabular data.
+
+```{r packages, echo=TRUE}
+install.packages('tidyverse',repos = "http://cran.us.r-project.org")
+install.packages("lubridate",repos = "http://cran.us.r-project.org")
+library("lubridate")
+library("tidyverse")
+library(data.table)
+library(dplyr)
+library(readr)
+```
+
+### Import Data into R Studio
+The data from June 2021 to may 2022 has been stored on separate CSV file based on the month of the year. The data.table will help us combine the data into one table.
+
+The file to be imported needs to be in the same working directory as the R project
+
+```{r import_files, echo=TRUE}
+july2021 <- read_csv("csv/202107-divvy-tripdata.csv")
+aug2021 <- read_csv("csv/202108-divvy-tripdata.csv")
+sep2021 <- read_csv("csv/202109-divvy-tripdata.csv")
+oct2021 <- read_csv("csv/202110-divvy-tripdata.csv")
+nov2021 <- read_csv("csv/202111-divvy-tripdata.csv")
+dec2021 <- read_csv("csv/202112-divvy-tripdata.csv")
+jan2022 <- read_csv("csv/202201-divvy-tripdata.csv")
+feb2022 <- read_csv("csv/202202-divvy-tripdata.csv")
+mar2022 <- read_csv("csv/202203-divvy-tripdata.csv")
+april2022 <- read_csv("csv/202204-divvy-tripdata.csv")
+may2022 <- read_csv("csv/202205-divvy-tripdata.csv")
+june2022 <- read_csv("csv/202206-divvy-tripdata.csv")
+```
+
+###Check the data structure
+
+Now that the data has been imported to R Studio, the next step is to assess the structure of the individual data frames before merging to check their column names and the datatypes. Str() is used to accomplish this task. Alternatively, the read.csv function also gives a summary of the column specification.
+
+```{r data_structure, echo=TRUE}
+str(july2021)
+str(aug2021)
+str(sep2021)
+str(oct2021)
+str(nov2021)
+str(dec2021)
+str(jan2022)
+str(feb2022)
+str(mar2022)
+str(april2022)
+str(may2022)
+str(june2022)
+
+```
+
+The datasets have matching data types for all the records and therefore can be combined without casuing any problem with the data structure.
+
+###Merge the datasets
+
+```{r echo=FALSE}
+whole_yr_trips <-bind_rows(july2021,aug2021,sep2021,oct2021,nov2021,dec2021,
+                           jan2022,feb2022,mar2022,april2022,may2022, june2022)
+
+head(whole_yr_trips)
+
+```
+
+###Creating new columns; ride_length and day_of_week
+
+As part of the processing, new columns that will later be used for analysis should be created. Ride_length is created by obtaining the difference between started_at and ended_at
+
+```{r ride_length, echo=FALSE}
+whole_yr_trips$ride_length <- difftime(whole_yr_trips$ended_at, whole_yr_trips$started_at, units = "secs")
+head(whole_yr_trips)
+
+```
+
+```{r echo=FALSE}
+str(whole_yr_trips)
+```
+
+
+By default,the ride_length would be **chr** data type and thus needs to be converted to numeric
+
+```{r rename_ride_length, echo=TRUE}
+#convert to numeric ride_length
+whole_yr_trips$ride_length <- as.numeric(
+  as.character(whole_yr_trips$ride_length)
+)
+
+str(whole_yr_trips)
+```
+
+Add the day of the week
+
+```{r column_weekday, echo=TRUE}
+#create a column to represent the day of the week, 
+whole_yr_trips$weekday <- wday(whole_yr_trips$started_at)
+```
+
+Ride lengths with negative values ad even zeros are not valid, and therefore should be removed from the combined data.
+
+
+```{r echo=TRUE}
+#remove entries with 0 or negative ride length
+whole_yr_trips <- whole_yr_trips %>%
+  filter(!(ride_length <= 0))
+View(whole_yr_trips)
+```
+There are entries where start_station_name and the end_station_name are **NULL**. These need to be removed.
+
+```{r echo=FALSE}
+# remove entries with null start and end station name
+whole_yr_trips <- whole_yr_trips %>%
+  filter(
+    !(is.na(start_station_name) | start_station_name == "")) %>% 
+    filter(
+    !(is.na(end_station_name) | end_station_name == ""))
+```
+
+Duplicate entries might bring some anomalies when analysing the data and therefore should be removed.
+
+```{r include=FALSE}
+#remove duplicate entries
+whole_yr_trips[!duplicated(whole_yr_trips$ride_id), ]
+```
+
+Now that the data set has been **cleaned**, export the data set to be used in the next step, that is **analysis**. 
+
+```{r export, echo=TRUE}
+# rename the dataset appropriately then export using write.csv function
+
+whole_yr_trips_cleaned <- whole_yr_trips
+write.csv(whole_yr_trips_cleaned,'whole_yr_trips_cleaned')
+head(whole_yr_trips_cleaned)
+
+```
+
+
